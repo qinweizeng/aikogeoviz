@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css"/>
+    <style>
+     
+    </style>
+</head>
+<body>
+    <!-- Our web map and content will go here -->
+    <div class='info'><h1>Blood Lead distribution in Philadelphia</h1></div>
+    <div id="map"></div>
+	
+    <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script>
+	    
+var grayscale = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' });		
+var Esri_WorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+});
+
+		var baseLayers = {
+			"Grayscale": grayscale,
+			"Satellite": Esri_WorldImagery
+		};
+
+		// create two layers of blood lead and septa stations
+		var overlayers_blood_lead = L.layerGroup();
+		var overlayers_septa_stations = L.layerGroup();
+
+		// Add census tract of blood lead in Philadelphia GeoJSON Data
+		var neighborhoodsLayer = null;
+		$.getJSON("data/blood_lead.geojson",function(data){
+		    neighborhoodsLayer = L.geoJson(data, {
+		    	style: styleFunc,
+		    	onEachFeature: onEachFeature
+		    }).addTo(overlayers_blood_lead);
+		});
+
+// add the septa station as new layers
+		L.marker([40.080842, -75.208011]).bindPopup('Chestnut Hill East').addTo(overlayers_septa_stations);
+		L.marker([40.065178, -75.191317]).bindPopup('Mount Airy').addTo(overlayers_septa_stations);
+		L.marker([40.037813, -75.172262]).bindPopup('Germantown').addTo(overlayers_septa_stations);
+		L.marker([39.981638, -75.149732]).bindPopup('Temple University').addTo(overlayers_septa_stations);        
+	    
+// combine the geojson layer
+var overlays = {
+    "Blood lead level": overlayers_blood_lead,
+    "Septa stations": overlayers_septa_stations
+};
+
+	    
+// create map object
+var map = L.map('map', {
+            center: [39.981192, -75.155399],
+            zoom: 10
+	    layers: [grayscale, overlayers_blood_lead]
+        });
+	    
+ function styleFunc(feature) {
+            return {
+                fillColor: setColorFunc(feature.properties.num_bll_5p),
+                fillOpacity: 0.9,
+                weight: 1,
+                opacity: 1,
+                color: '#ffffff',
+                dashArray: '3'
+            };
+        };
+
+function setColorFunc(density) {
+    return density > 15 ? '#393503' :
+           density > 10 ? '#ac9e09' :
+           density > 5 ? '#f9ef88' :
+           density > 0 ? '#fdfad7' :
+                         '#ffffe0';
+        };
+
+	    var highlight = {
+			'fillColor': 'yellow',
+			'weight': 5,
+			'opacity': 1
+		};
+
+        function onEachFeatureFunc(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: zoomFeature
+            });
+        }
+		function highlightFeature(e){
+			var layer = e.target;
+
+			layer.setStyle({
+				weight: 5,
+				color: '#666',
+				dashArray: '',
+				fillOpacity: 0.7
+			});
+
+// for different web browsers
+			if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+		        layer.bringToFront();
+		    }
+		}		
+
+        // Define what happens on mouseout:
+ function resetHighlight(e) {
+     neighborhoodsLayer.setStyle({
+         fillOpacity: 0.9,
+         weight: 1,
+         opacity: 1,
+         color: '#ffffff',
+         dashArray: '3'
+     });
+     // neighborhoodsLayer.resetStyle(e.target);
+  }
+		
+     // As an additional touch, let’s define a click listener that zooms to the state: 
+        function zoomFeature(e) {
+            // console.log(e.target.getBounds());
+	    var layer = e.target,
+	    neighorboodsLayer.setStyle(styleFunc); //resets layer colors
+            layer.setStyle(highlight);  //highlights selected.
+
+            map.fitBounds(e.target.getBounds().pad(1.5));
+        };
+
+	var legend = L.control({
+            position: 'bottomright'
+        });
+
+        legend.onAdd = function (map) {
+            // Create Div Element and Populate it with HTML
+            var div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<b>Blood lead level</b><br />';
+            div.innerHTML += 'by census tract<br />';
+            div.innerHTML += '<br>';
+            div.innerHTML += '<i style="background: #393503"></i><p>15+</p>';
+            div.innerHTML += '<i style="background: #ac9e09"></i><p>10-15</p>';
+            div.innerHTML += '<i style="background: #f9ef88"></i><p>5-10</p>';
+            div.innerHTML += '<i style="background: #fdfad7"></i><p>0-5</p>';
+            div.innerHTML += '<hr>';
+            div.innerHTML += '<i style="background: #ffffe0"></i><p>No Data</p>';
+
+            // Return the Legend div containing the HTML content
+            return div;
+        };
+
+        // Add Legend to Map
+        legend.addTo(map);
+
+        // Add Scale Bar to Map
+	L.control.scale({position: 'bottomleft'}).addTo(map);
+	L.control.layers(baseLayers, overlays).addTo(map);
+    </script>
+</body>
+
+</html>
